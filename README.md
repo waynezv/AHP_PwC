@@ -9,17 +9,15 @@ Audio based human profiling for PwC project.
 ## Usage
 First go to the main directory
 
-'''bash
-cd ~/ProJEX/AHP_PwC
-'''
+> cd ~/ProJEX/AHP_PwC
 
 ### 1. Extract OpenSMILE features
-1. '''bash
-cd feat_extract
-'''
+1.
+> cd feat_extract
 
 2. '''bash
 bash smile_feature_extractor.sh -c ${PATH_TO_OPENSMILE}/opensmile-2.3.0/config/IS13_ComParE.conf -f ./timit_test_wavlist.ctl -i ${PATH_TO_DATASET} -o ${OUTPUT_PATH} -t temp
+'''
 
 3. The extracted features are already in *AHP_PwC/timit_opensmile_feat* and *AHP_PwC/interrogation_opensmile_feat*
 
