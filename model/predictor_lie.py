@@ -14,9 +14,9 @@ from torch.autograd import Variable
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
 
-from modelbase.dataloader import dataloader
+from modelbase.dataloader import lydataloader
 from modelbase.args import parser
-from modelbase.model import Regressor, weights_init
+from modelbase.model import Autoencoder, weights_init
 from modelbase.utils import save_checkpoint
 
 # Parse args
@@ -51,9 +51,9 @@ if args.resume:  # Resume from saved checkpoint
         checkpoint = torch.load(args.resume)
 
         print("=> creating model")
-        netR = Regressor().cuda()
+        netAE = Autoencoder().cuda()
 
-        netR.load_state_dict(checkpoint['netR_state_dict'])
+        netAE.load_state_dict(checkpoint['netAE_state_dict'])
         print("=> loaded model with checkpoint '{}' (epoch {})".
               format(args.resume, checkpoint['epoch']))
     else:
@@ -63,19 +63,18 @@ if args.resume:  # Resume from saved checkpoint
 
 else:
     print("=> creating model")
-    netR = Regressor().cuda()
-    print(netR)
-    netR.apply(weights_init)
+    netAE = Autoencoder().cuda()
+    print(netAE)
+    netAE.apply(weights_init)
 
 # Prepare data
 task = args.task
-featdir = '../timit_opensmile_feat'
-trainlist = './timit_train_featlist.ctl'
-testlist = './timit_test_featlist.ctl'
-timitinfo = './timit.info'
+featdirs = ('../timit_opensmile_feat', '../interrogation_opensmile_feat')
+trainlists = ('./timit_train_featlist.ctl', './interrogation_train_featlist.ctl')
+testlists = ('./timit_test_featlist.ctl', './interrogation_test_featlist.ctl')
 print('=> loading data for task ' + Fore.GREEN + '{}'.format(task) + Fore.RESET)
 loader_args = {'batch': True, 'batch_size': args.batchSize, 'shuffle': True, 'num_workers': 32}
-train_loader, test_loader = dataloader(featdir, trainlist, testlist, timitinfo, task, loader_args)
+train_loader, test_loader = lydataloader(featdirs, trainlists, testlists, loader_args)
 
 # Eval
 if args.eval:
@@ -86,26 +85,38 @@ if args.eval:
     # test_feat = np.loadtxt(args.testFn, delimiter=';', skiprows=1, usecols=range(1, 6374 + 1))
     # x = torch.from_numpy(test_feat).float().view(1, -1)
     # x = Variable(x.cuda(), volatile=True)
-    # yp = netR(x)
-    # print("Predicted {} for '{}': {:.4f}".format(args.task, args.testFn, yp.data[0]))
+    # z, xr, yp = netAE(x)
+    # pred = yp.ge(0.5)
+    # np.savetxt(os.path.join(args.outf, 'eval', 'z_feature.csv'), z.data.cpu().numpy(),
+               # delimiter=',', header='dim {}'.format(z.size(1)), comments='# ')
 
-    test_err = 0  # average test error
+    pred_acc = 0  # prediction accuracy
+    zs = []
     for x, y in test_loader:
         x = Variable(x.cuda(), volatile=True)
         y = Variable(y.float().cuda())
-        yp = netR(x)
-        loss_mae = (yp - y).abs().mean()
-        test_err += loss_mae.data[0]
-    test_err = test_err / float(len(test_loader))
-    print(Fore.RED + 'Mean absolute error: {:.4f}'.format(test_err) + Fore.RESET)
+        z, xr, yp = netAE(x)
+        loss_r = torch.nn.functional.mse_loss(x, xr) + z.norm()
+        loss_p = torch.nn.functional.binary_cross_entropy(yp, y)
+        loss = loss_r + loss_p
+        pred = yp.ge(0.5).float()
+        pred_acc += (pred.eq(y).sum().float() / float(y.size(0))).data[0]
+        zs.append(z)
+    pred_acc = pred_acc / float(len(test_loader))
+    for i in range(len(zs)):
+        np.savetxt(os.path.join(args.outf, 'eval', 'z_feature_{:d}.csv'.format(i)), zs[i].data.cpu().numpy(),
+                   delimiter=',', header='dim {}'.format(zs[i].size(1)), comments='# ')
+
+    print('Prediction accuracy: {:.4f}'.format(pred_acc))
+    print('Saved z feature to {}'.format(os.path.join(args.outf, 'eval')))
     sys.exit(0)
 
 # Setup optimizer
-optimizerR = optim.Adam(netR.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+optimizerAE = optim.Adam(netAE.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
 
 # Training settings
 old_record_fn = 'youll_never_find_me'  # old record filename
-best_test_err = 1e19
+best_test_acc = 0.
 best_epoch = 0
 
 # Train model
@@ -114,49 +125,58 @@ for epoch in range(args.nepoch):
     i = 0
     for x, y in train_loader:
         i += 1
-        netR.zero_grad()
+        netAE.zero_grad()
         x = Variable(x.cuda())
         y = Variable(y.float().cuda())
-        yp = netR(x)
-        loss_mae = (yp - y).abs().mean()  # mean absolute error
-        loss_mae.backward()
-        optimizerR.step()
+        z, xr, yp = netAE(x)
+        loss_r = torch.nn.functional.mse_loss(x, xr) + z.norm()  # reconstruction loss
+        loss_p = torch.nn.functional.binary_cross_entropy(yp, y)  # prediction loss
+        loss = loss_r + loss_p
+        loss.backward()
+        optimizerAE.step()
         print('[{:d}/{:d}][{:d}/{:d}] '.format(epoch, args.nepoch, i, len(train_loader)) +
-              'loss_mae: {:.4f}'.format(loss_mae.data[0]))
+              'loss_r: {:.4f} loss_p: {:.4f}'.format(loss_r.data[0], loss_p.data[0]))
 
     # Test
-    test_err = 0  # average test error
+    test_loss = 0  # average test loss
+    pred_acc = 0  # prediction accuracy
     for x, y in test_loader:
         x = Variable(x.cuda(), volatile=True)
         y = Variable(y.float().cuda())
-        yp = netR(x)
-        loss_mae = (yp - y).abs().mean()
-        test_err += loss_mae.data[0]
-    test_err = test_err / float(len(test_loader))
-    print(Fore.RED + 'Test error: {:.4f}'.format(test_err) + Fore.RESET)
+        z, xr, yp = netAE(x)
+        loss_r = torch.nn.functional.mse_loss(x, xr) + z.norm()
+        loss_p = torch.nn.functional.binary_cross_entropy(yp, y)
+        loss = loss_r + loss_p
+        pred = yp.ge(0.5).float()
+        test_loss += loss.data[0]
+        pred_acc += (pred.eq(y).sum().float() / float(y.size(0))).data[0]
+    test_loss = test_loss / float(len(test_loader))
+    pred_acc = pred_acc / float(len(test_loader))
+    print(Fore.RED + 'Test loss: {:.4f} Pred acc: {:.4f}'.
+          format(test_loss, pred_acc) + Fore.RESET)
 
     # Save best
     if not os.path.exists(os.path.join(args.outf, 'checkpoints')):
         os.makedirs(os.path.join(args.outf, 'checkpoints'))
-    is_best = test_err < best_test_err
+    is_best = pred_acc > best_test_acc
     if is_best:
-        best_test_err = test_err
+        best_test_acc = pred_acc
         best_epoch = epoch
         save_checkpoint({
             'args': args,
             'epoch': epoch,
             'best_epoch': best_epoch,
-            'best_test_err': best_test_err,
-            'netR_state_dict': netR.state_dict()
+            'best_test_acc': best_test_acc,
+            'netAE_state_dict': netAE.state_dict()
         }, os.path.join(args.outf, 'checkpoints'), 'checkpoint_BEST.pth.tar')
-        print(Fore.GREEN + 'Saved checkpoint for best test error {:.4f} at epoch {:d}'.
-              format(best_test_err, best_epoch) + Fore.RESET)
+        print(Fore.GREEN + 'Saved checkpoint for best test accuracy {:.4f} at epoch {:d}'.
+              format(best_test_acc, best_epoch) + Fore.RESET)
 
     # Checkpointing
     save_checkpoint({
         'args': args,
         'epoch': epoch,
-        'netR_state_dict': netR.state_dict(),
+        'netAE_state_dict': netAE.state_dict()
     }, os.path.join(args.outf, 'checkpoints'), 'checkpoint_epoch_{:d}.pth.tar'.format(epoch))
 
     # Delete old checkpoint to save space

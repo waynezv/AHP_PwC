@@ -52,7 +52,7 @@ done
 [[ -d "$OUTDIR" ]] || ( echo "$OUTDIR not found"; exit 1 )
 [[ -d "$TMPDIR" ]]|| ( echo "$TMPDIR not found"; exit 1 )
 
-opensmile=./opensmile-2.3.0/bin/linux_x64_standalone_libstdc6/SMILExtract  # openSMILE executable
+opensmile=../opensmile-2.3.0/bin/linux_x64_standalone_libstdc6/SMILExtract  # openSMILE executable
 
 TMPFILE=$( mktemp --tmpdir=${TMPDIR} tmp.XXXX )  # make tmp file
 

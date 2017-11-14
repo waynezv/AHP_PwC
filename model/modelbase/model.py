@@ -12,34 +12,60 @@ class Autoencoder(nn.Module):
     def __init__(self):
         super(Autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(6374, 2000),
-            nn.BatchNorm1d(2000),
-            nn.LeakyReLU(0.2),
-            nn.Linear(2000, 1000),
+            nn.Linear(6374, 1000),
             nn.BatchNorm1d(1000),
             nn.LeakyReLU(0.2),
-            nn.Linear(1000, 500),
-            nn.BatchNorm1d(500),
-            nn.LeakyReLU(0.2),
-            nn.Linear(500, 200),
+            nn.Linear(1000, 200),
             nn.BatchNorm1d(200),
+            nn.LeakyReLU(0.2),
+            nn.Linear(200, 20)
         )
         self.decoder = nn.Sequential(
-            nn.Linear(200, 500),
-            nn.BatchNorm1d(500),
+            nn.Linear(20, 200),
+            nn.BatchNorm1d(200),
             nn.LeakyReLU(0.2),
-            nn.Linear(500, 1000),
+            nn.Linear(200, 1000),
             nn.BatchNorm1d(1000),
             nn.LeakyReLU(0.2),
-            nn.Linear(1000, 2000),
-            nn.BatchNorm1d(2000),
+            nn.Linear(1000, 6374)
+        )
+        self.predictor = nn.Sequential(
+            nn.Linear(20, 200),
+            nn.BatchNorm1d(200),
             nn.LeakyReLU(0.2),
-            nn.Linear(2000, 6374),
-            nn.BatchNorm1d(6374),
+            nn.Linear(200, 200),
+            nn.BatchNorm1d(200),
+            nn.LeakyReLU(0.2),
+            nn.Linear(200, 1),
+            nn.Sigmoid()
         )
 
     def forward(self, x):
-        return self.decoder(self.encoder(x))
+        z = self.encoder(x)
+        return z, self.decoder(z), self.predictor(z).view(-1)
+
+
+class Regressor(nn.Module):
+    '''
+    Regressor.
+    '''
+    def __init__(self):
+        super(Regressor, self).__init__()
+        self.regressor = nn.Sequential(
+            nn.Linear(6374, 1000),
+            nn.BatchNorm1d(1000),
+            nn.LeakyReLU(0.2),
+            nn.Linear(1000, 200),
+            nn.BatchNorm1d(200),
+            nn.LeakyReLU(0.2),
+            nn.Linear(200, 40),
+            nn.BatchNorm1d(40),
+            nn.LeakyReLU(0.2),
+            nn.Linear(40, 1)
+        )
+
+    def forward(self, x):
+        return self.regressor(x).view(-1)
 
 
 def weights_init(m):
