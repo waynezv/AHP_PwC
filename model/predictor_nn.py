@@ -148,7 +148,7 @@ for epoch in range(args.nepoch):
             'best_epoch': best_epoch,
             'best_test_err': best_test_err,
             'netR_state_dict': netR.state_dict()
-        }, os.path.join(args.outf, 'checkpoints'), 'checkpoint_BEST.pth.tar')
+        }, os.path.join(args.outf, 'checkpoints'), 'checkpoint_BEST_{}.pth.tar'.format(args.task))
         print(Fore.GREEN + 'Saved checkpoint for best test error {:.4f} at epoch {:d}'.
               format(best_test_err, best_epoch) + Fore.RESET)
 

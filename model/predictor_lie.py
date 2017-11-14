@@ -168,7 +168,7 @@ for epoch in range(args.nepoch):
             'best_epoch': best_epoch,
             'best_test_acc': best_test_acc,
             'netAE_state_dict': netAE.state_dict()
-        }, os.path.join(args.outf, 'checkpoints'), 'checkpoint_BEST.pth.tar')
+        }, os.path.join(args.outf, 'checkpoints'), 'checkpoint_BEST_lie.pth.tar')
         print(Fore.GREEN + 'Saved checkpoint for best test accuracy {:.4f} at epoch {:d}'.
               format(best_test_acc, best_epoch) + Fore.RESET)
 
