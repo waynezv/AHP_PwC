@@ -22,7 +22,8 @@ First go to the main directory
 
 ----
 ### 2.1 Train model for age and height prediction
-1. cd AHP_PwC/model
+1.
+> cd AHP_PwC/model
 
 2. **age**
 
@@ -37,7 +38,8 @@ The trained model is saved in *AHP_PwC/model/age_prediction/checkpoints*.
 The trained model is saved in *AHP_PwC/model/height_prediction/checkpoints*.
 
 ### 2.2. Evaluate model
-1. cd AHP_PwC/model
+1.
+> cd AHP_PwC/model
 
 2. **age**
 
@@ -45,11 +47,12 @@ The trained model is saved in *AHP_PwC/model/height_prediction/checkpoints*.
 
 **height**
 
-> CUDA_VISIBLE_DEVICES=3 python predictor_nn.py --task height --cuda --manualSeed 1234 --outf height_prediction --resume height_prediction/checkpoints/checkpoint_BEST.pth.tar --eval --testFn height_prediction/sa1.smile
+> CUDA_VISIBLE_DEVICES=3 python predictor_nn.py --task height --cuda --manualSeed 1234 --outf height_prediction --resume height_prediction/checkpoints/checkpoint_BEST.pth.tar --eval
 
 ----
 ### 3.1. Train model for lie detection
-1. cd AHP_PwC/model
+1.
+> cd AHP_PwC/model
 
 2.
 > CUDA_VISIBLE_DEVICES=3 python predictor_lie.py --task lie --cuda --manualSeed 1234 --nepoch 30 --outf lie_prediction
@@ -58,7 +61,8 @@ The trained model is saved in *AHP_PwC/model/height_prediction/checkpoints*.
 The trained model is saved in *AHP_PwC/model/lie_prediction/checkpoints*.
 
 ### 3.2. Evaluate model
-1. cd AHP_PwC/model
+1.
+> cd AHP_PwC/model
 
 2.
 > CUDA_VISIBLE_DEVICES=3 python predictor_lie.py --task lie --cuda --manualSeed 1234 --outf lie_prediction --resume lie_prediction/checkpoints/checkpoint_BEST.pth.tar --eval
